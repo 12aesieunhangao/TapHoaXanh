@@ -5,13 +5,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-<<<<<<< HEAD
     origin: 'http://localhost:3000',
     credentials: true,
-=======
-    origin: '*',
->>>>>>> pr/10
-  });
+  })
+
   const config = new DocumentBuilder()
     .setTitle('Cats example')
     .setDescription('The cats API description')
@@ -20,9 +17,7 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
   await app.listen(process.env.PORT ?? 5000);
-<<<<<<< HEAD
   console.log(`Ứng dụng đang chạy với port: ${process.env.PORT ?? 5000}`);
-=======
->>>>>>> pr/10
+
 }
 bootstrap();
