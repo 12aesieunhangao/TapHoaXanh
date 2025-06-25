@@ -1,11 +1,14 @@
-// components/CategorySidebar.tsx
 'use client'
 import React from 'react'
 
+interface Category {
+  id: number
+  name: string
+}
 interface CategorySidebarProps {
-  categories: string[]
-  selected: string
-  onSelect: (cat: string) => void
+  categories: Category[]
+  selected: number
+  onSelect: (catId: number) => void
 }
 
 export default function CategorySidebar({ categories, selected, onSelect }: CategorySidebarProps) {
@@ -14,12 +17,12 @@ export default function CategorySidebar({ categories, selected, onSelect }: Cate
       <ul className="list-group">
         {categories.map(cat => (
           <li
-            key={cat}
-            className={`list-group-item ${selected === cat ? 'active' : ''} cursor-pointer`}
+            key={cat.id}
+            className={`list-group-item ${selected === cat.id ? 'active' : ''}`}
             style={{ cursor: 'pointer' }}
-            onClick={() => onSelect(cat)}
+            onClick={() => onSelect(cat.id)}
           >
-            {cat}
+            {cat.name}
           </li>
         ))}
       </ul>

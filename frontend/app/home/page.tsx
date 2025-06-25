@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import api from '@/lib/axios'
-import SearchFilter from '@/components/SearchFilter/page'
+import SearchFilter from '@/components/Search'
 import Pagination from '@/components/Pagination'
 
 interface Product {
@@ -20,64 +20,54 @@ interface Product {
 
 export default function HomePage() {
   const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const [filter, setFilter] = useState({ search: '', category: '', maxPrice: '' })
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 20
+  const itemsPerPage = 20 //số lượng sản phẩm mỗi trang 
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await api.get('/products')
-        const data: unknown = res.data
-
-        let productList: Product[] = []
-        if (Array.isArray(data)) {
-          productList = data as Product[]
-        } else if (
-          typeof data === 'object' &&
-          data !== null &&
-          Array.isArray((data as { products?: unknown }).products)
-        ) {
-          productList = (data as { products: Product[] }).products
-        } else {
-          console.error('❌ Dữ liệu sản phẩm không hợp lệ:', data)
-        }
-
-        setAllProducts(productList)
-        setProducts(productList)
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          console.error('🚫 Lỗi lấy danh sách sản phẩm:', err.message)
-        } else {
-          console.error('🚫 Lỗi không xác định:', err)
-        }
-      } finally {
-        setLoading(false)
+    api.get('/products').then(res => {
+      let data: any[] = []
+      if (Array.isArray(res.data)) {
+        data = res.data
+      } else if (
+        res.data && 
+        typeof res.data === 'object' &&
+        Array.isArray((res.data as any)?.products)
+      ) {
+        data = (res.data as any).products
       }
-    }
-
-    fetchData()
-  }, [])
-
-  const handleFilter = (filters: { search: string; category: string; maxPrice: string }) => {
-    const { search, category, maxPrice } = filters
-
-    const filtered = allProducts.filter((product) => {
-      const matchSearch = product.name.toLowerCase().includes(search.toLowerCase())
-      const matchCategory = category ? product.category?.toLowerCase() === category : true
-      const matchPrice = maxPrice ? product.price <= parseInt(maxPrice, 10) : true
-      return matchSearch && matchCategory && matchPrice
+      setAllProducts(data)
+      setLoading(false)
     })
+  }, [])
+  
 
-    setProducts(filtered)
+  const filteredProducts = useMemo(() => {
+    let filtered = allProducts
+    if (filter.search) {
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(filter.search.toLowerCase())
+      )
+    }
+    if (filter.category) {
+      filtered = filtered.filter(p =>
+        (p.category || '').toLowerCase() === filter.category
+      )
+    }
+    if (filter.maxPrice) {
+      filtered = filtered.filter(p => p.price <= parseInt(filter.maxPrice, 10))
+    }
+    return filtered
+  }, [allProducts, filter])
+
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+
+  const handleFilter = (f: { search: string; category: string; maxPrice: string }) => {
+    setFilter(f)
     setCurrentPage(1)
   }
-
-  // Tính toán phân trang
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentProducts = products.slice(startIndex, endIndex)
 
   return (
     <div>
@@ -88,7 +78,7 @@ export default function HomePage() {
           <p>Đang tải sản phẩm...</p>
         ) : (
           <>
-            {products.length === 0 ? (
+            {filteredProducts.length === 0 ? (
               <div className="alert alert-warning mt-4 mb-4">
                 Không tìm thấy sản phẩm phù hợp.
               </div>
@@ -103,6 +93,7 @@ export default function HomePage() {
                         alt={product.name}
                         width={400}
                         height={300}
+                        loading="lazy"
                       />
                       <div className="card-body">
                         <h5 className="card-title">{product.name}</h5>
@@ -123,14 +114,13 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* PHÂN TRANG - sử dụng props theo Pagination mới */}
-            {products.length > 0 && (
+            {filteredProducts.length > 0 && (
               <Pagination
                 currentPage={currentPage}
-                totalItems={products.length}
+                totalItems={filteredProducts.length}
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
-                maxPagesToShow={5} // Có thể bỏ dòng này nếu không cần
+                maxPagesToShow={5}
               />
             )}
           </>

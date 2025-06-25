@@ -5,7 +5,7 @@ interface PaginationProps {
   totalItems: number
   itemsPerPage: number
   onPageChange: (page: number) => void
-  maxPagesToShow?: number // tuỳ chọn: số nút phân trang hiển thị (default 5)
+  maxPagesToShow?: number
 }
 
 export default function Pagination({
@@ -18,7 +18,6 @@ export default function Pagination({
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   if (totalPages <= 1) return null
 
-  // Hiển thị phân trang dạng ... 4 5 6 7 8 ...
   let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2))
   let endPage = startPage + maxPagesToShow - 1
   if (endPage > totalPages) {

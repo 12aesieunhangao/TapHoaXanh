@@ -4,122 +4,151 @@ import { useEffect, useState } from 'react'
 import CategorySidebar from '@/components/CategorySidebar'
 import CategoryFilter from '@/components/CategoryFilter'
 import CategoryProductList from '@/components/CategoryProductList'
-import api from '@/lib/axios'
 import Pagination from '@/components/Pagination'
+import api from '@/lib/axios'
 
-interface Product {
-  id: number
-  name: string
-  price: number
-  slug: string
-  images: string
-  discount: number
-  description: string
-  category: string
-}
-
-const DUMMY_CATEGORIES = ['Tất cả', 'Rau', 'Thịt', 'Hải sản'] // Có thể lấy từ API nếu cần
+interface Category {
+    id: number
+    name: string
+  }
+  
+  interface Product {
+    id: number
+    name: string
+    price: number
+    slug: string
+    images: string
+    discount: number
+    description: string
+    category?: string
+  }
+  
+  interface CategoryResponse {
+    categories?: Category[]
+    // nếu API trả về [{id,name}] thì không cần
+  }
+  
+  interface ProductResponse {
+    products?: Product[]
+    // nếu API trả về [{...}] thì không cần
+  }
+  
 
 export default function CategoryPage() {
-  const [category, setCategory] = useState('Tất cả')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  // Lưu bộ lọc hiện tại
+
+  // Filter và phân trang
   const [filters, setFilters] = useState<{ name: string; min: string; max: string; sort: string }>({
     name: '',
     min: '',
     max: '',
     sort: 'newest',
   })
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
 
-  // Lấy sản phẩm từ API
+  // Lấy category và sản phẩm từ API
   useEffect(() => {
-    api.get('/products').then(res => {
-      let data = res.data
-      let productList: Product[] = []
-
-      if (Array.isArray(data)) {
-        productList = data
-      } else if (data && typeof data === 'object' && Array.isArray((data as { products?: unknown }).products)) {
-        productList = (data as { products: Product[] }).products
-      }
-
-      setAllProducts(productList)
-      setLoading(false)
-    })
+    setLoading(true)
+    Promise.all([
+      api.get('/categories'),
+      api.get('/products'),
+    ])
+      .then(([catRes, prodRes]) => {
+        // --- Lấy danh mục ---
+        let catData: Category[] = []
+        const catRaw = catRes.data
+        if (Array.isArray(catRaw)) {
+          catData = catRaw
+        } else if (
+          catRaw &&
+          typeof catRaw === 'object' &&
+          Array.isArray((catRaw as CategoryResponse).categories)
+        ) {
+          catData = (catRaw as CategoryResponse).categories!
+        }
+        setCategories([{ id: 0, name: 'Tất cả' }, ...catData])
+  
+        // --- Lấy sản phẩm ---
+        let productList: Product[] = []
+        const prodRaw = prodRes.data
+        if (Array.isArray(prodRaw)) {
+          productList = prodRaw
+        } else if (
+          prodRaw &&
+          typeof prodRaw === 'object' &&
+          Array.isArray((prodRaw as ProductResponse).products)
+        ) {
+          productList = (prodRaw as ProductResponse).products!
+        }
+        setAllProducts(productList)
+      })
+      .finally(() => setLoading(false))
   }, [])
+  
 
-  // Khi chọn danh mục bên trái, reset filter name/min/max về rỗng, reset page về 1
-  const handleCategorySelect = (cat: string) => {
-    setCategory(cat)
-    setFilters(f => ({ ...f, name: '', min: '', max: '' }))
+
+  // Khi chọn danh mục mới, reset filter và về trang 1
+  const handleCategorySelect = (catId: number) => {
+    setSelectedCategory(catId)
+    setFilters({ name: '', min: '', max: '', sort: 'newest' })
     setCurrentPage(1)
   }
 
-  // Khi lọc, cập nhật filters và về trang 1
+  // Khi lọc trên filter bar, về trang 1
   const handleFilter = (filterValues: { name: string; min: string; max: string; sort: string }) => {
     setFilters(filterValues)
     setCurrentPage(1)
   }
 
-  // Apply lọc, sắp xếp, và chỉ lấy sản phẩm của page hiện tại
+  // Lọc sản phẩm
   const getFilteredProducts = () => {
     let filtered = [...allProducts]
-
-    // Lọc theo category
-    if (category !== 'Tất cả') {
-      filtered = filtered.filter(
-        p => (p.category || '').toLowerCase() === category.toLowerCase()
-      )
-    }
-    // Lọc theo tên
+    if (selectedCategory && selectedCategory !== 0) {
+        filtered = filtered.filter(p => Number(p.category) === selectedCategory)    }
     if (filters.name) {
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(filters.name.toLowerCase())
       )
     }
-    // Lọc giá từ - đến
-    if (filters.min) {
-      filtered = filtered.filter(product => product.price >= Number(filters.min))
-    }
-    if (filters.max) {
-      filtered = filtered.filter(product => product.price <= Number(filters.max))
-    }
+    if (filters.min) filtered = filtered.filter(product => product.price >= Number(filters.min))
+    if (filters.max) filtered = filtered.filter(product => product.price <= Number(filters.max))
     // Sắp xếp
-    if (filters.sort === 'price-asc') {
-      filtered.sort((a, b) => a.price - b.price)
-    } else if (filters.sort === 'price-desc') {
-      filtered.sort((a, b) => b.price - a.price)
-    } else if (filters.sort === 'newest') {
-      filtered.sort((a, b) => b.id - a.id)
-    } else if (filters.sort === 'oldest') {
-      filtered.sort((a, b) => a.id - b.id)
-    }
+    if (filters.sort === 'price-asc') filtered.sort((a, b) => a.price - b.price)
+    else if (filters.sort === 'price-desc') filtered.sort((a, b) => b.price - a.price)
+    else if (filters.sort === 'newest') filtered.sort((a, b) => b.id - a.id)
+    else if (filters.sort === 'oldest') filtered.sort((a, b) => a.id - b.id)
     return filtered
   }
 
   const filteredProducts = getFilteredProducts()
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+  const totalItems = filteredProducts.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const currentProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   return (
     <div className="container-fluid">
       <div className="row">
-        {/* Sidebar */}
+        {/* Sidebar category */}
         <div className="col-md-2">
           <CategorySidebar
-            categories={DUMMY_CATEGORIES}
-            selected={category}
+            categories={categories}
+            selected={selectedCategory ?? 0}
             onSelect={handleCategorySelect}
           />
         </div>
         {/* Main content */}
         <div className="col-md-10">
-          <h2 className="mb-4">Danh mục: {category}</h2>
+          <h2 className="mb-4">
+            Danh mục:{" "}
+            {categories.find(c => c.id === selectedCategory)?.name || 'Tất cả'}
+          </h2>
           <CategoryFilter onFilter={handleFilter} />
           {loading ? (
             <p>Đang tải sản phẩm...</p>
@@ -130,7 +159,7 @@ export default function CategoryPage() {
           )}
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredProducts.length}
+            totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
           />
